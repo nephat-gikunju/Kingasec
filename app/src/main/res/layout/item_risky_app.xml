@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="4dp"
+    android:backgroundTint="@android:color/white"
+    android:foreground="?attr/selectableItemBackground">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <!-- App Icon -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardView_app_icon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:id="@+id/imageView_app_icon"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                tools:src="@drawable/ic_app_placeholder"
+                android:contentDescription="App Icon"/>
+        </androidx.cardview.widget.CardView>
+
+        <!-- App Name -->
+        <TextView
+            android:id="@+id/textView_app_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="8dp"
+            android:text="App Name"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:maxLines="1"
+            android:ellipsize="end"
+            app:layout_constraintStart_toEndOf="@+id/cardView_app_icon"
+            app:layout_constraintTop_toTopOf="@+id/cardView_app_icon"
+            app:layout_constraintEnd_toStartOf="@+id/imageView_risk_indicator"
+            tools:text="Tala"/>
+
+        <!-- Risk Reason -->
+        <TextView
+            android:id="@+id/textView_risk_reason"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="8dp"
+            android:text="Risk reason description"
+            android:textSize="14sp"
+            android:textColor="#666666"
+            android:maxLines="2"
+            android:ellipsize="end"
+            app:layout_constraintStart_toEndOf="@+id/cardView_app_icon"
+            app:layout_constraintTop_toBottomOf="@+id/textView_app_name"
+            app:layout_constraintEnd_toStartOf="@+id/imageView_risk_indicator"
+            app:layout_constraintBottom_toBottomOf="@+id/cardView_app_icon"
+            tools:text="Access to Contacts &amp; Calendar"/>
+
+        <!-- Risk Level Indicator -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardView_risk_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            android:backgroundTint="#FFE5E8"
+            app:layout_constraintEnd_toStartOf="@+id/imageView_risk_indicator"
+            app:layout_constraintTop_toTopOf="@+id/textView_app_name">
+
+            <TextView
+                android:id="@+id/textView_risk_level"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HIGH"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#D32F2F"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp"/>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Action Arrow -->
+        <ImageView
+            android:id="@+id/imageView_risk_indicator"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_chevron_right"
+            android:contentDescription="View Details"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:tint="#CCCCCC" />
+
+        <!-- Permission Icons (Optional - can show top 3 risky permissions) -->
+        <LinearLayout
+            android:id="@+id/linearLayout_permissions"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:gravity="start"
+            app:layout_constraintStart_toEndOf="@+id/cardView_app_icon"
+            app:layout_constraintTop_toBottomOf="@+id/textView_risk_reason"
+            app:layout_constraintEnd_toStartOf="@+id/imageView_risk_indicator"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_contacts_small"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="Contacts Permission"
+                app:tint="#FF9800" />
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_sms_small"
+                android:layout_marginEnd="4dp"
+                android:contentDescription="SMS Permission"
+                app:tint="#FF5722" />
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_location_small"
+                android:contentDescription="Location Permission"
+                app:tint="#F44336" />
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.cardview.widget.CardView>

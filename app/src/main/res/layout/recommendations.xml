@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    android:backgroundTint="#F8F9FA">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp">
+
+        <!-- Recommendation Icon -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            android:backgroundTint="#E3F2FD"
+            android:layout_marginEnd="12dp">
+
+            <ImageView
+                android:id="@+id/imageView_recommendation_icon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_security"
+                android:contentDescription="Recommendation Icon"
+                app:tint="#2196F3" />
+        </androidx.cardview.widget.CardView>
+
+        <!-- Recommendation Text -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/textView_recommendation_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Recommendation Title"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                tools:text="Disable SMS Permission"/>
+
+            <TextView
+                android:id="@+id/textView_recommendation_description"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Recommendation description"
+                android:textSize="12sp"
+                android:textColor="#666666"
+                android:layout_marginTop="2dp"
+                tools:text="SMS access is not required for this loan app's core functionality"/>
+        </LinearLayout>
+
+        <!-- Priority Indicator -->
+        <TextView
+            android:id="@+id/textView_priority"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="HIGH"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:textColor="#D32F2F"
+            android:background="@drawable/priority_badge"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"/>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
