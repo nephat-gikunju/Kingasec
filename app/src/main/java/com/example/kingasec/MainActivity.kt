@@ -90,10 +90,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateDashboard() {
         val highRiskApps = scannedApps.filter { it.riskLevel == RiskLevel.HIGH }
-        val flaggedAppsCount = scannedApps.size
+        val mediumRiskApps = scannedApps.filter { it.riskLevel == RiskLevel.MEDIUM }
+        val totalAppsScanned = scannedApps.size
 
         animateCounterText(binding.textViewHighRiskCount, highRiskApps.size)
-        animateCounterText(binding.textViewFlaggedCount, flaggedAppsCount)
+        animateCounterText(binding.textViewFlaggedCount, highRiskApps.size + mediumRiskApps.size)
 
         updateRiskLevelDisplay(highRiskApps.size)
     }
@@ -159,9 +160,8 @@ class MainActivity : AppCompatActivity() {
 
                 showToast("Scanned ${scannedData.size} apps")
 
-                // Process apps and calculate risk scores
-                // For now, we'll use a simple heuristic until ML model is integrated
-                scannedApps = scannedData.mapNotNull { app ->
+                // Process ALL apps and calculate risk scores
+                scannedApps = scannedData.map { app ->
                     processScannedApp(app)
                 }
 
@@ -174,6 +174,21 @@ class MainActivity : AppCompatActivity() {
                 // Update UI
                 riskyAppsAdapter.updateApps(scannedApps)
                 updateDashboard()
+
+                // Save results to manager for sharing with other activities
+                ScanResultsManager.setScanResults(
+                    scannedApps.map { app ->
+                        ScanResultsManager.ScannedAppResult(
+                            appName = app.appName,
+                            packageName = app.packageName,
+                            reason = app.reason,
+                            riskLevel = app.riskLevel.name,
+                            iconResId = app.iconResId,
+                            permissions = app.permissions,
+                            privacyRiskScore = app.privacyRiskScore
+                        )
+                    }
+                )
 
                 showToast("Scan completed - ${scannedApps.size} apps analyzed")
 
@@ -192,15 +207,10 @@ class MainActivity : AppCompatActivity() {
      * Process a scanned app and calculate risk score
      * TODO: Replace this with actual ML model prediction
      */
-    private fun processScannedApp(app: AppScannerService.ScannedApp): RiskyApp? {
+    private fun processScannedApp(app: AppScannerService.ScannedApp): RiskyApp {
         // Calculate a simple risk score based on dangerous permissions
         // This is temporary until ML model is integrated
         val riskScore = calculateRiskScore(app)
-
-        // Only include apps with some risk
-        if (riskScore < 2.0f) {
-            return null
-        }
 
         val riskLevel = when {
             riskScore >= 7.0f -> RiskLevel.HIGH
@@ -282,8 +292,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAllApps() {
-        showToast("Showing all ${scannedApps.size} analyzed apps")
-        // TODO: Navigate to a full list view
+        if (scannedApps.isEmpty()) {
+            showToast("No apps scanned yet. Please run a scan first.")
+            return
+        }
+
+        val intent = Intent(this, AllAppsActivity::class.java)
+        // Pass the scanned apps data
+        // Note: You might want to use a more efficient method like ViewModel or database
+        startActivity(intent)
     }
 
     private fun openSettings() {

@@ -43,6 +43,11 @@
             android:name=".SettingsActivity"
             android:parentActivityName=".MainActivity" />
 
+        <activity
+            android:name=".AllAppsActivity"
+            android:parentActivityName=".MainActivity"
+            android:label="All Scanned Apps" />
+
     </application>
 
 </manifest>
