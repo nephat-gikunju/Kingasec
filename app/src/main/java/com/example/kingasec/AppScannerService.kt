@@ -80,9 +80,7 @@ class AppScannerService(private val context: Context) {
         "android.permission.ACTIVITY_RECOGNITION"
     )
 
-    /**
-     * Scan all installed applications (excluding system apps by default)
-     */
+
     suspend fun scanAllApps(includeSystemApps: Boolean = false): List<ScannedApp> =
         withContext(Dispatchers.IO) {
             val packageManager = context.packageManager

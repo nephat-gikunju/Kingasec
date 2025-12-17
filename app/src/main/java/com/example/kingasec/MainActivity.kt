@@ -180,10 +180,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Processes a scanned app. It first checks against a master exclusion list.
-     * If not excluded, it gets a risk score and fetches an enhanced description from the API if needed.
-     */
+
     private suspend fun processScannedApp(app: AppScannerService.ScannedApp): RiskyApp {
         // Master exclusion list to immediately classify trusted apps as LOW risk.
         if (mlProcessor.isAppExcluded(app)) {
