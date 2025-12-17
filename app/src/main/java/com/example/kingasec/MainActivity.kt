@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -15,6 +16,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.kingasec.databinding.ActivityMainBinding
 import com.example.kingasec.databinding.ItemRiskyAppBinding
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -27,23 +30,6 @@ class MainActivity : AppCompatActivity() {
     // Cached scan results
     private var scannedApps: List<RiskyApp> = emptyList()
     private var isScanning = false
-
-    // Enhanced data models
-    data class RiskyApp(
-        val appName: String,
-        val packageName: String,
-        val reason: String,
-        val riskLevel: RiskLevel,
-        val iconResId: Int,
-        val permissions: List<String> = emptyList(),
-        val privacyRiskScore: Float = 0f
-    )
-
-    enum class RiskLevel(val displayName: String, val colorResId: Int, val bgColorResId: Int) {
-        HIGH("HIGH", R.color.risk_high, R.color.risk_high_bg),
-        MEDIUM("MEDIUM", R.color.risk_medium, R.color.risk_medium_bg),
-        LOW("LOW", R.color.risk_low, R.color.risk_low_bg)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,7 +77,6 @@ class MainActivity : AppCompatActivity() {
     private fun updateDashboard() {
         val highRiskApps = scannedApps.filter { it.riskLevel == RiskLevel.HIGH }
         val mediumRiskApps = scannedApps.filter { it.riskLevel == RiskLevel.MEDIUM }
-        val totalAppsScanned = scannedApps.size
 
         animateCounterText(binding.textViewHighRiskCount, highRiskApps.size)
         animateCounterText(binding.textViewFlaggedCount, highRiskApps.size + mediumRiskApps.size)
@@ -135,10 +120,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.buttonOptimize.setOnClickListener {
-            optimizePrivacySettings()
-        }
-
         binding.textViewViewAll.setOnClickListener {
             showAllApps()
         }
@@ -155,27 +136,23 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // Scan all non-system apps
                 val scannedData = appScanner.scanAllApps(includeSystemApps = false)
+                showToast("Scanned ${scannedData.size} apps. Analyzing permissions...")
 
-                showToast("Scanned ${scannedData.size} apps")
-
-                // Process ALL apps and calculate risk scores
+                // Asynchronously process all apps
                 scannedApps = scannedData.map { app ->
-                    processScannedApp(app)
-                }
+                    async { processScannedApp(app) }
+                }.awaitAll()
 
-                // Sort by risk level (HIGH first)
+                // Sort by risk level (HIGH > MEDIUM > LOW)
                 scannedApps = scannedApps.sortedWith(
-                    compareByDescending<RiskyApp> { it.riskLevel.ordinal }
+                    compareBy<RiskyApp> { it.riskLevel.ordinal }
                         .thenByDescending { it.privacyRiskScore }
                 )
 
-                // Update UI
                 riskyAppsAdapter.updateApps(scannedApps)
                 updateDashboard()
 
-                // Save results to manager for sharing with other activities
                 ScanResultsManager.setScanResults(
                     scannedApps.map { app ->
                         ScanResultsManager.ScannedAppResult(
@@ -190,7 +167,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 )
 
-                showToast("Scan completed - ${scannedApps.size} apps analyzed")
+                showToast("Scan complete! ${scannedApps.size} apps analyzed.")
 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -204,82 +181,50 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Process a scanned app and calculate risk score
-     * TODO: Replace this with actual ML model prediction
+     * Processes a scanned app. It first checks against a master exclusion list.
+     * If not excluded, it gets a risk score and fetches an enhanced description from the API if needed.
      */
-    private fun processScannedApp(app: AppScannerService.ScannedApp): RiskyApp {
-        // Calculate a simple risk score based on dangerous permissions
-        // This is temporary until ML model is integrated
-        val riskScore = calculateRiskScore(app)
-
-        val riskLevel = when {
-            riskScore >= 7.0f -> RiskLevel.HIGH
-            riskScore >= 4.0f -> RiskLevel.MEDIUM
-            else -> RiskLevel.LOW
+    private suspend fun processScannedApp(app: AppScannerService.ScannedApp): RiskyApp {
+        // Master exclusion list to immediately classify trusted apps as LOW risk.
+        if (mlProcessor.isAppExcluded(app)) {
+            return RiskyApp(
+                appName = app.appName,
+                packageName = app.packageName,
+                reason = "This is a trusted application. Its permissions are appropriate for its functions.",
+                riskLevel = RiskLevel.LOW,
+                iconResId = R.drawable.ic_app_placeholder,
+                permissions = app.dangerousPermissions.map { it.removePrefix("android.permission.") },
+                privacyRiskScore = 1.0f
+            )
         }
 
-        val reason = mlProcessor.generateRiskDescription(app, riskScore)
+        // If not excluded, proceed with the normal analysis pipeline.
+        val riskScore = mlProcessor.predictRiskScore(app)
+        val riskLevel = mlProcessor.scoreToRiskLevel(riskScore)
+
+        var reason = mlProcessor.generateRiskDescription(app, riskScore)
+
+        // For high and medium risk apps, get a more detailed reason from the cloud.
+        if (riskLevel == RiskLevel.HIGH || riskLevel == RiskLevel.MEDIUM) {
+            val enhancedReason = ContextChecker.getRiskAnalysis(
+                appName = app.appName,
+                appCategory = app.category,
+                permissions = app.dangerousPermissions
+            )
+            if (enhancedReason != null) {
+                reason = enhancedReason
+            }
+        }
 
         return RiskyApp(
             appName = app.appName,
             packageName = app.packageName,
             reason = reason,
             riskLevel = riskLevel,
-            iconResId = R.drawable.ic_app_placeholder, // You can save actual icon if needed
-            permissions = app.dangerousPermissions.map {
-                it.removePrefix("android.permission.")
-            },
+            iconResId = R.drawable.ic_app_placeholder,
+            permissions = app.dangerousPermissions.map { it.removePrefix("android.permission.") },
             privacyRiskScore = riskScore
         )
-    }
-
-    /**
-     * Simple risk score calculation (temporary heuristic)
-     * TODO: Replace with ML model prediction
-     */
-    private fun calculateRiskScore(app: AppScannerService.ScannedApp): Float {
-        var score = 0f
-
-        // Base score on dangerous permissions count
-        score += app.dangerousPermissions.size * 0.8f
-
-        // Add extra weight for particularly sensitive permissions
-        val criticalPermissions = listOf(
-            "READ_SMS", "SEND_SMS", "READ_CONTACTS",
-            "READ_CALL_LOG", "ACCESS_FINE_LOCATION"
-        )
-
-        app.dangerousPermissions.forEach { perm ->
-            if (criticalPermissions.any { perm.contains(it) }) {
-                score += 1.0f
-            }
-        }
-
-        // Adjust based on category
-        when (app.category) {
-            "Finance" -> {
-                // Finance apps with SMS/Contacts are higher risk
-                if (app.dangerousPermissions.any { it.contains("SMS") }) {
-                    score += 2.0f
-                }
-                if (app.dangerousPermissions.any { it.contains("CONTACTS") }) {
-                    score += 1.5f
-                }
-            }
-            "Game" -> {
-                // Games shouldn't need many permissions
-                if (app.dangerousPermissions.size > 2) {
-                    score += 2.0f
-                }
-            }
-        }
-
-        // Cap at 10
-        return minOf(score, 10f)
-    }
-
-    private fun optimizePrivacySettings() {
-        showToast("Privacy optimization feature coming soon!")
     }
 
     private fun showAppDetails(app: RiskyApp) {
@@ -298,8 +243,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         val intent = Intent(this, AllAppsActivity::class.java)
-        // Pass the scanned apps data
-        // Note: You might want to use a more efficient method like ViewModel or database
         startActivity(intent)
     }
 
@@ -309,16 +252,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun animateCardEntrance() {
-        val cards = listOf(
-            binding.cardViewScore,
-            binding.buttonScan,
-            binding.recyclerViewRiskyApps
-        )
-
+        val cards = listOf(binding.cardViewScore, binding.buttonScan, binding.recyclerViewRiskyApps)
         cards.forEachIndexed { index, view ->
             view.alpha = 0f
             view.translationY = 100f
-
             view.animate()
                 .alpha(1f)
                 .translationY(0f)
@@ -330,60 +267,44 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun animateCounterText(textView: TextView, targetValue: Int) {
-        ValueAnimator.ofInt(0, targetValue).apply {
-            duration = 1000
-            interpolator = DecelerateInterpolator()
-            addUpdateListener { animation ->
-                textView.text = animation.animatedValue.toString()
-            }
-            start()
+        val animator = ValueAnimator.ofInt(textView.text.toString().toIntOrNull() ?: 0, targetValue)
+        animator.duration = 1000
+        animator.interpolator = DecelerateInterpolator()
+        animator.addUpdateListener { animation ->
+            textView.text = animation.animatedValue.toString()
         }
+        animator.start()
     }
 
     private fun showToast(message: String) {
-        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }
 
 class RiskyAppsAdapter(
-    private var apps: List<MainActivity.RiskyApp>,
-    private val onItemClick: (MainActivity.RiskyApp) -> Unit
+    private var apps: List<RiskyApp>,
+    private val onItemClick: (RiskyApp) -> Unit
 ) : RecyclerView.Adapter<RiskyAppsAdapter.ViewHolder>() {
 
     class ViewHolder(private val binding: ItemRiskyAppBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(app: MainActivity.RiskyApp, onItemClick: (MainActivity.RiskyApp) -> Unit) {
+        fun bind(app: RiskyApp, onItemClick: (RiskyApp) -> Unit) {
             binding.textViewAppName.text = app.appName
             binding.textViewRiskReason.text = app.reason
             binding.textViewRiskLevel.text = app.riskLevel.displayName
             binding.imageViewAppIcon.setImageResource(app.iconResId)
 
             val context = binding.root.context
-            binding.textViewRiskLevel.setTextColor(
-                ContextCompat.getColor(context, app.riskLevel.colorResId)
-            )
-            binding.cardViewRiskBadge.setCardBackgroundColor(
-                ContextCompat.getColor(context, app.riskLevel.bgColorResId)
-            )
-
-            if (app.permissions.isNotEmpty()) {
-                binding.linearLayoutPermissions.visibility = View.VISIBLE
-            } else {
-                binding.linearLayoutPermissions.visibility = View.GONE
-            }
+            binding.textViewRiskLevel.setTextColor(ContextCompat.getColor(context, app.riskLevel.colorResId))
+            binding.cardViewRiskBadge.setCardBackgroundColor(ContextCompat.getColor(context, app.riskLevel.bgColorResId))
 
             binding.root.setOnClickListener { onItemClick(app) }
-
-            binding.root.alpha = 0.8f
-            binding.root.animate().alpha(1f).setDuration(200).start()
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemRiskyAppBinding.inflate(
-            LayoutInflater.from(parent.context), parent, false
-        )
+        val binding = ItemRiskyAppBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return ViewHolder(binding)
     }
 
@@ -393,7 +314,7 @@ class RiskyAppsAdapter(
 
     override fun getItemCount() = apps.size
 
-    fun updateApps(newApps: List<MainActivity.RiskyApp>) {
+    fun updateApps(newApps: List<RiskyApp>) {
         apps = newApps
         notifyDataSetChanged()
     }

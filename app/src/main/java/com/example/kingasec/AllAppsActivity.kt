@@ -40,16 +40,6 @@ class AllAppsActivity : AppCompatActivity() {
         val privacyRiskScore: Float
     )
 
-    enum class RiskLevel(val displayName: String, val colorResId: Int, val bgColorResId: Int) {
-        HIGH("HIGH", R.color.risk_high, R.color.risk_high_bg),
-        MEDIUM("MEDIUM", R.color.risk_medium, R.color.risk_medium_bg),
-        LOW("LOW", R.color.risk_low, R.color.risk_low_bg)
-    }
-
-    companion object {
-        const val EXTRA_ALL_APPS = "extra_all_apps"
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_all_apps)
@@ -85,7 +75,7 @@ class AllAppsActivity : AppCompatActivity() {
     }
 
     private fun loadAppsData() {
-        // Load from ScanResultsManager
+        // Load from ScanResultsManager and sort the data
         val results = ScanResultsManager.getScanResults()
 
         allApps = results.map { result ->
@@ -103,7 +93,10 @@ class AllAppsActivity : AppCompatActivity() {
                 permissions = result.permissions,
                 privacyRiskScore = result.privacyRiskScore
             )
-        }
+        }.sortedWith(
+            compareBy<AppData> { it.riskLevel.ordinal }
+                .thenByDescending { it.privacyRiskScore }
+        )
 
         filteredApps = allApps
     }
@@ -175,14 +168,6 @@ class AllAppsActivity : AppCompatActivity() {
             putExtra(AppDetailsActivity.EXTRA_RISK_LEVEL, app.riskLevel.name)
         }
         startActivity(intent)
-    }
-
-    // Function to receive apps from MainActivity
-    fun setApps(apps: List<AppData>) {
-        allApps = apps
-        filteredApps = apps
-        allAppsAdapter.updateApps(filteredApps)
-        updateStats()
     }
 }
 
