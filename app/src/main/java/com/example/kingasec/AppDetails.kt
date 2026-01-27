@@ -15,6 +15,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.cardview.widget.CardView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
@@ -36,7 +37,6 @@ class AppDetailsActivity : AppCompatActivity() {
     private lateinit var recyclerViewSafePermissions: RecyclerView
     private lateinit var recyclerViewRecommendations: RecyclerView
     private lateinit var buttonOpenAppSettings: MaterialButton
-    private lateinit var buttonUninstallApp: MaterialButton
     private lateinit var textViewInstallDate: TextView
     private lateinit var textViewLastUpdated: TextView
     private lateinit var textViewAppSize: TextView
@@ -44,8 +44,7 @@ class AppDetailsActivity : AppCompatActivity() {
 
     // Data
     private lateinit var appInfo: AppInfo
-    private lateinit var permissionsAdapter: PermissionsAdapter // Changed
-    private lateinit var recommendationsAdapter: RecommendationsAdapter // Changed
+    private lateinit var recommendationsAdapter: RecommendationsAdapter
 
     data class AppInfo(
         val appName: String,
@@ -72,12 +71,6 @@ class AppDetailsActivity : AppCompatActivity() {
         val priority: Priority,
         val iconResId: Int
     )
-
-    enum class RiskLevel(val displayName: String, val colorResId: Int, val bgColorResId: Int) {
-        HIGH("HIGH RISK", android.R.color.holo_red_dark, android.R.color.white),
-        MEDIUM("MEDIUM RISK", android.R.color.holo_orange_dark, android.R.color.white),
-        LOW("LOW RISK", android.R.color.holo_green_dark, android.R.color.white)
-    }
 
     enum class Priority(val displayName: String, val colorResId: Int) {
         HIGH("HIGH", android.R.color.holo_red_dark),
@@ -116,7 +109,6 @@ class AppDetailsActivity : AppCompatActivity() {
         recyclerViewSafePermissions = findViewById(R.id.recyclerView_safe_permissions)
         recyclerViewRecommendations = findViewById(R.id.recyclerView_recommendations)
         buttonOpenAppSettings = findViewById(R.id.button_open_app_settings)
-        buttonUninstallApp = findViewById(R.id.button_uninstall_app)
         textViewInstallDate = findViewById(R.id.textView_install_date)
         textViewLastUpdated = findViewById(R.id.textView_last_updated)
         textViewAppSize = findViewById(R.id.textView_app_size)
@@ -134,115 +126,108 @@ class AppDetailsActivity : AppCompatActivity() {
     }
 
     private fun loadAppData() {
-        // Get data from intent
-        val appName = intent.getStringExtra(EXTRA_APP_NAME) ?: "Unknown App"
-        val packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME) ?: "com.unknown.app"
-        val riskLevelName = intent.getStringExtra(EXTRA_RISK_LEVEL) ?: "HIGH"
+        val packageName = intent.getStringExtra(EXTRA_PACKAGE_NAME) ?: return
 
-        val riskLevel = when (riskLevelName) {
-            "HIGH" -> RiskLevel.HIGH
-            "MEDIUM" -> RiskLevel.MEDIUM
-            "LOW" -> RiskLevel.LOW
-            else -> RiskLevel.HIGH
+        val scanResult = ScanResultsManager.getScanResults().find { it.packageName == packageName }
+        if (scanResult == null) {
+            Toast.makeText(this, "App details not found.", Toast.LENGTH_SHORT).show()
+            finish()
+            return
         }
 
-        // Create app info (in real app, this would come from your database/analysis)
+        val riskLevel = try {
+            RiskLevel.valueOf(scanResult.riskLevel)
+        } catch (e: IllegalArgumentException) {
+            RiskLevel.LOW // Default to LOW if the string is invalid
+        }
+
         appInfo = AppInfo(
-            appName = appName,
-            packageName = packageName,
+            appName = scanResult.appName,
+            packageName = scanResult.packageName,
             riskLevel = riskLevel,
-            iconResId = android.R.drawable.ic_dialog_alert,
-            description = when (riskLevel) {
-                RiskLevel.HIGH -> "This app accesses sensitive data extensively and may pose privacy risks. Some permissions appear unnecessary for core functionality."
-                RiskLevel.MEDIUM -> "This app requests several permissions that could impact privacy, but most appear justified for its functionality."
-                RiskLevel.LOW -> "This app uses standard permissions appropriately and poses minimal privacy risks."
-            },
-            installDate = "Dec 15, 2024",
-            lastUpdated = "Jan 10, 2025",
-            appSize = "45.2 MB",
-            version = "3.2.1"
+            iconResId = scanResult.iconResId,
+            description = scanResult.reason,
+            installDate = "", // Will be loaded below
+            lastUpdated = "", // Will be loaded below
+            appSize = "", // Will be loaded below
+            version = ""
         )
 
-        // Load real app data if possible
         try {
             val packageInfo = packageManager.getPackageInfo(packageName, 0)
-            val appInfoPm = packageManager.getApplicationInfo(packageName, 0) // Renamed to avoid conflict with class member
-
-            // Update with real data
-            this.appInfo = this.appInfo.copy(
+            appInfo = appInfo.copy(
                 version = packageInfo.versionName ?: "Unknown",
                 installDate = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
                     .format(Date(packageInfo.firstInstallTime)),
                 lastUpdated = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
                     .format(Date(packageInfo.lastUpdateTime))
-                // Consider adding app size from packageInfo if available/needed
             )
         } catch (e: PackageManager.NameNotFoundException) {
-            // App not found, use dummy data
+            // App not found, use placeholder data
         }
     }
 
     private fun setupRecyclerViews() {
-        // Sample permissions data
-        val highRiskPermissions = listOf(
-            Permission("Access Contacts", "Read your contacts and call history", android.R.drawable.ic_menu_call, RiskLevel.HIGH),
-            Permission("Read SMS", "Read your text messages", android.R.drawable.ic_dialog_email, RiskLevel.HIGH),
-            Permission("Access Location", "Access your precise location", android.R.drawable.ic_dialog_map, RiskLevel.HIGH)
-        )
+        val permissions = try {
+            val packageInfo = packageManager.getPackageInfo(appInfo.packageName, PackageManager.GET_PERMISSIONS)
+            packageInfo.requestedPermissions?.toList() ?: emptyList()
+        } catch (e: PackageManager.NameNotFoundException) {
+            emptyList()
+        }
 
-        val mediumRiskPermissions = listOf(
-            Permission("Camera", "Take pictures and record videos", android.R.drawable.ic_menu_camera, RiskLevel.MEDIUM),
-            Permission("Microphone", "Record audio", android.R.drawable.ic_btn_speak_now, RiskLevel.MEDIUM)
-        )
+        val allPermissions = permissions.mapNotNull { permissionName ->
+            val (desc, risk) = PermissionInfo.getPermissionDetails(permissionName)
+            if (desc != "Unknown permission") { // Only add known permissions
+                Permission(
+                    name = permissionName.substringAfterLast('.'),
+                    description = desc,
+                    iconResId = PermissionInfo.getPermissionIcon(permissionName),
+                    riskLevel = risk
+                )
+            } else {
+                null
+            }
+        }
 
-        val safePermissions = listOf(
-            Permission("Internet", "Access network connections", android.R.drawable.ic_dialog_info, RiskLevel.LOW),
-            Permission("Vibrate", "Control device vibration", android.R.drawable.ic_dialog_info, RiskLevel.LOW)
-        )
+        val highRiskPermissions = allPermissions.filter { it.riskLevel == RiskLevel.HIGH }
+        val mediumRiskPermissions = allPermissions.filter { it.riskLevel == RiskLevel.MEDIUM }
+        val safePermissions = allPermissions.filter { it.riskLevel == RiskLevel.LOW }
 
-        // Sample recommendations
-        val recommendations = listOf(
-            Recommendation(
-                "Disable SMS Permission",
-                "SMS access is not required for this loan app's core functionality",
-                Priority.HIGH,
-                android.R.drawable.ic_dialog_alert
-            ),
-            Recommendation(
-                "Review Contact Access",
-                "Consider if contact access is necessary for your use case",
-                Priority.MEDIUM,
-                android.R.drawable.ic_dialog_info
-            ),
-            Recommendation(
-                "Enable App Permissions Review",
-                "Regularly review and audit app permissions",
-                Priority.LOW,
-                android.R.drawable.ic_dialog_info
-            )
-        )
-
-        // Setup adapters
-        permissionsAdapter = PermissionsAdapter(highRiskPermissions) // Changed
         recyclerViewHighRiskPermissions.apply {
             layoutManager = LinearLayoutManager(this@AppDetailsActivity)
-            adapter = permissionsAdapter
+            adapter = PermissionsAdapter(highRiskPermissions)
             isNestedScrollingEnabled = false
         }
 
         recyclerViewMediumRiskPermissions.apply {
             layoutManager = LinearLayoutManager(this@AppDetailsActivity)
-            adapter = PermissionsAdapter(mediumRiskPermissions) // Changed
+            adapter = PermissionsAdapter(mediumRiskPermissions)
             isNestedScrollingEnabled = false
         }
 
         recyclerViewSafePermissions.apply {
             layoutManager = LinearLayoutManager(this@AppDetailsActivity)
-            adapter = PermissionsAdapter(safePermissions) // Changed
+            adapter = PermissionsAdapter(safePermissions)
             isNestedScrollingEnabled = false
         }
 
-        recommendationsAdapter = RecommendationsAdapter(recommendations) // Changed
+        // Sample recommendations (can be made dynamic later)
+        val recommendations = listOf(
+            Recommendation(
+                "Disable Unused Permissions",
+                "Regularly review and disable permissions that the app doesn't need for its core functionality.",
+                Priority.HIGH,
+                android.R.drawable.ic_dialog_alert
+            ),
+            Recommendation(
+                "Check Data Access",
+                "Monitor how this app uses your data, especially with high-risk permissions.",
+                Priority.MEDIUM,
+                android.R.drawable.ic_dialog_info
+            )
+        )
+
+        recommendationsAdapter = RecommendationsAdapter(recommendations)
         recyclerViewRecommendations.apply {
             layoutManager = LinearLayoutManager(this@AppDetailsActivity)
             adapter = recommendationsAdapter
@@ -253,10 +238,6 @@ class AppDetailsActivity : AppCompatActivity() {
     private fun setupClickListeners() {
         buttonOpenAppSettings.setOnClickListener {
             openAppSettings()
-        }
-
-        buttonUninstallApp.setOnClickListener {
-            showUninstallDialog()
         }
     }
 
@@ -270,23 +251,15 @@ class AppDetailsActivity : AppCompatActivity() {
         textViewAppSize.text = appInfo.appSize
         textViewAppVersion.text = appInfo.version
 
-        imageViewAppIconLarge.setImageResource(appInfo.iconResId)
-
-        // Set risk level colors
-        when (appInfo.riskLevel) {
-            RiskLevel.HIGH -> {
-                cardViewRiskBadgeLarge.setCardBackgroundColor(getColor(android.R.color.holo_red_light))
-                textViewRiskLevelLarge.setTextColor(getColor(android.R.color.holo_red_dark))
-            }
-            RiskLevel.MEDIUM -> {
-                cardViewRiskBadgeLarge.setCardBackgroundColor(getColor(android.R.color.holo_orange_light))
-                textViewRiskLevelLarge.setTextColor(getColor(android.R.color.holo_orange_dark))
-            }
-            RiskLevel.LOW -> {
-                cardViewRiskBadgeLarge.setCardBackgroundColor(getColor(android.R.color.holo_green_light))
-                textViewRiskLevelLarge.setTextColor(getColor(android.R.color.holo_green_dark))
-            }
+        try {
+            val icon = packageManager.getApplicationIcon(appInfo.packageName)
+            imageViewAppIconLarge.setImageDrawable(icon)
+        } catch (e: PackageManager.NameNotFoundException) {
+            imageViewAppIconLarge.setImageResource(R.drawable.ic_app_placeholder)
         }
+
+        cardViewRiskBadgeLarge.setCardBackgroundColor(ContextCompat.getColor(this, appInfo.riskLevel.bgColorResId))
+        textViewRiskLevelLarge.setTextColor(ContextCompat.getColor(this, appInfo.riskLevel.colorResId))
     }
 
     private fun openAppSettings() {
@@ -299,31 +272,9 @@ class AppDetailsActivity : AppCompatActivity() {
             Toast.makeText(this, "Unable to open app settings", Toast.LENGTH_SHORT).show()
         }
     }
-
-    private fun showUninstallDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Uninstall App")
-            .setMessage("Are you sure you want to uninstall ${appInfo.appName}? This action cannot be undone.")
-            .setPositiveButton("Uninstall") { _, _ ->
-                uninstallApp()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun uninstallApp() {
-        try {
-            val intent = Intent(Intent.ACTION_DELETE).apply {
-                data = Uri.parse("package:${appInfo.packageName}")
-            }
-            startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "Unable to uninstall app", Toast.LENGTH_SHORT).show()
-        }
-    }
 }
 
-// Permissions Adapter
+// Adapter for Permissions
 class PermissionsAdapter(private val permissions: List<AppDetailsActivity.Permission>) :
     RecyclerView.Adapter<PermissionsAdapter.ViewHolder>() {
 
@@ -347,20 +298,15 @@ class PermissionsAdapter(private val permissions: List<AppDetailsActivity.Permis
         holder.textViewPermissionDescription.text = permission.description
         holder.imageViewPermissionIcon.setImageResource(permission.iconResId)
 
-        val riskColor = when (permission.riskLevel) {
-            AppDetailsActivity.RiskLevel.HIGH -> android.R.color.holo_red_dark
-            AppDetailsActivity.RiskLevel.MEDIUM -> android.R.color.holo_orange_dark
-            AppDetailsActivity.RiskLevel.LOW -> android.R.color.holo_green_dark
-        }
         holder.viewRiskIndicator.setBackgroundColor(
-            holder.itemView.context.getColor(riskColor)
+            holder.itemView.context.getColor(permission.riskLevel.colorResId)
         )
     }
 
     override fun getItemCount() = permissions.size
 }
 
-// Recommendations Adapter
+// Adapter for Recommendations
 class RecommendationsAdapter(private val recommendations: List<AppDetailsActivity.Recommendation>) :
     RecyclerView.Adapter<RecommendationsAdapter.ViewHolder>() {
 
@@ -373,7 +319,7 @@ class RecommendationsAdapter(private val recommendations: List<AppDetailsActivit
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.recommendations, parent, false) // Ensure this layout name is correct
+            .inflate(R.layout.recommendations, parent, false)
         return ViewHolder(view)
     }
 
@@ -385,15 +331,44 @@ class RecommendationsAdapter(private val recommendations: List<AppDetailsActivit
         holder.textViewPriority.text = recommendation.priority.displayName
         holder.imageViewRecommendationIcon.setImageResource(recommendation.iconResId)
 
-        val priorityColor = when (recommendation.priority) {
-            AppDetailsActivity.Priority.HIGH -> android.R.color.holo_red_dark
-            AppDetailsActivity.Priority.MEDIUM -> android.R.color.holo_orange_dark
-            AppDetailsActivity.Priority.LOW -> android.R.color.holo_green_dark
-        }
-        holder.textViewPriority.setTextColor(
-            holder.itemView.context.getColor(priorityColor)
-        )
+        val priorityColor = holder.itemView.context.getColor(recommendation.priority.colorResId)
+        holder.textViewPriority.setTextColor(priorityColor)
     }
 
     override fun getItemCount() = recommendations.size
+}
+
+// Helper object to provide details about Android permissions
+private object PermissionInfo {
+    private val permissionDetails = mapOf(
+        "android.permission.READ_CONTACTS" to Pair("Read your contacts and call history", RiskLevel.HIGH),
+        "android.permission.READ_SMS" to Pair("Read your text messages", RiskLevel.HIGH),
+        "android.permission.ACCESS_FINE_LOCATION" to Pair("Access your precise location", RiskLevel.HIGH),
+        "android.permission.CAMERA" to Pair("Take pictures and record videos", RiskLevel.HIGH),
+        "android.permission.RECORD_AUDIO" to Pair("Record audio", RiskLevel.HIGH),
+        "android.permission.READ_CALL_LOG" to Pair("Read your call log", RiskLevel.HIGH),
+        "android.permission.WRITE_EXTERNAL_STORAGE" to Pair("Write to external storage (legacy)", RiskLevel.HIGH),
+
+        "android.permission.ACCESS_COARSE_LOCATION" to Pair("Access your approximate location", RiskLevel.MEDIUM),
+        "android.permission.READ_PHONE_STATE" to Pair("Read phone status and identity", RiskLevel.MEDIUM),
+        "android.permission.GET_ACCOUNTS" to Pair("Find accounts on the device", RiskLevel.MEDIUM),
+        "android.permission.BLUETOOTH_ADMIN" to Pair("Pair with Bluetooth devices", RiskLevel.MEDIUM),
+
+        "android.permission.INTERNET" to Pair("Access network connections", RiskLevel.LOW),
+        "android.permission.VIBRATE" to Pair("Control device vibration", RiskLevel.LOW),
+        "android.permission.ACCESS_NETWORK_STATE" to Pair("View network connections", RiskLevel.LOW),
+        "android.permission.WAKE_LOCK" to Pair("Prevent phone from sleeping", RiskLevel.LOW)
+    )
+
+    fun getPermissionDetails(permission: String): Pair<String, RiskLevel> {
+        return permissionDetails[permission] ?: Pair("Unknown permission", RiskLevel.LOW)
+    }
+
+    fun getPermissionIcon(permission: String): Int {
+        return when (getPermissionDetails(permission).second) {
+            RiskLevel.HIGH -> android.R.drawable.ic_dialog_alert
+            RiskLevel.MEDIUM -> android.R.drawable.ic_dialog_info
+            RiskLevel.LOW -> android.R.drawable.ic_dialog_info
+        }
+    }
 }

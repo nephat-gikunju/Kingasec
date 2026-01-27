@@ -82,7 +82,7 @@
                         app:layout_constraintStart_toEndOf="@+id/cardView_app_icon_large"
                         app:layout_constraintTop_toTopOf="@+id/cardView_app_icon_large"
                         app:layout_constraintEnd_toEndOf="parent"
-                        tools:text="Tala"/>
+                        tools:text="App"/>
 
                     <!-- Package Name -->
                     <TextView
@@ -98,7 +98,7 @@
                         app:layout_constraintStart_toEndOf="@+id/cardView_app_icon_large"
                         app:layout_constraintTop_toBottomOf="@+id/textView_app_name_large"
                         app:layout_constraintEnd_toEndOf="parent"
-                        tools:text="com.inventure.tala"/>
+                        tools:text="com.inventure.app"/>
 
                     <!-- Risk Level Badge -->
                     <androidx.cardview.widget.CardView
@@ -316,21 +316,7 @@
                     app:iconGravity="textStart"
                     app:iconPadding="8dp"/>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/button_uninstall_app"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="UNINSTALL"
-                    android:textSize="14sp"
-                    app:cornerRadius="16dp"
-                    app:backgroundTint="@android:color/white"
-                    app:strokeColor="#F44336"
-                    app:strokeWidth="2dp"
-                    android:textColor="#F44336"
-                    app:icon="@drawable/ic_delete_red"
-                    app:iconTint="#F44336"/>
+
             </LinearLayout>
 
             <!-- App Stats -->

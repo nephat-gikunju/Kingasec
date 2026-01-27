@@ -38,7 +38,7 @@
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:src="@drawable/ic_shield_white"
-                    android:contentDescription="Shield Icon"
+                    android:contentDescription="KingaSec"
                     android:layout_marginEnd="12dp"/>
 
                 <TextView
@@ -46,7 +46,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Smart Shield"
+                    android:text="KingaSec"
                     android:textSize="28sp"
                     android:textStyle="bold"
                     android:textColor="@android:color/white"/>
@@ -252,44 +252,20 @@
                 </androidx.cardview.widget.CardView>
             </LinearLayout>
 
-            <!-- Action Buttons -->
-            <LinearLayout
+            <!-- Action Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_scan"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="24dp">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/button_scan"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="2"
-                    android:layout_marginEnd="8dp"
-                    android:text="SCAN NOW"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="16dp"
-                    app:backgroundTint="#4CAF50"
-                    app:icon="@drawable/ic_scan_white"
-                    app:iconGravity="textStart"
-                    app:iconPadding="8dp"/>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/button_optimize"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="FIX"
-                    android:textSize="16sp"
-                    app:cornerRadius="16dp"
-                    app:backgroundTint="@android:color/white"
-                    app:strokeColor="#E0E0E0"
-                    app:strokeWidth="2dp"
-                    android:textColor="#666666"
-                    app:icon="@drawable/ic_fix_gray"
-                    app:iconTint="#666666"/>
-            </LinearLayout>
+                android:layout_height="56dp"
+                android:layout_marginBottom="24dp"
+                android:text="SCAN NOW"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:backgroundTint="#4CAF50"
+                app:icon="@drawable/ic_scan_white"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp"/>
 
             <!-- Risky Apps Section -->
             <LinearLayout
