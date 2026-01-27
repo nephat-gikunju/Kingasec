@@ -14,6 +14,7 @@ import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.POST
 
+
 // Data classes for OpenAI API request and response
 @Serializable
 data class OpenAiRequest(
